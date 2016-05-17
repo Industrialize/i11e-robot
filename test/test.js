@@ -1,6 +1,6 @@
 exports['test Robot'] = {
   'test robot': (test) => {
-    var createRobot = require('../lib/index').createRobot;
+    var createRobot = require('../lib/index')().createRobot;
     var Box = require('i11e-box');
     var Robot = createRobot({
       input() {
