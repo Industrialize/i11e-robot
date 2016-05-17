@@ -277,7 +277,7 @@ var createRobot = (delegate) => {
       return [];
     }
 
-    static isRobot() {
+    static isRobot(object) {
       return typeof object === 'object' && object !== null && object.__type__ == 'robot';
     }
   }
@@ -286,7 +286,7 @@ var createRobot = (delegate) => {
 }
 
 module.exports = {
-  isRobot: () => {return typeof object === 'object' && object !== null && object.__type__ == 'robot';},
+  isRobot: (object) => {return typeof object === 'object' && object !== null && object.__type__ == 'robot';},
   createRobot: createRobot,
   visitors: visitors
 }
