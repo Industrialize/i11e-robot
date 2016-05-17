@@ -286,6 +286,7 @@ var createRobot = (delegate) => {
 }
 
 module.exports = {
+  isRobot: () => {return typeof object === 'object' && object !== null && object.__type__ == 'robot';},
   createRobot: createRobot,
   visitors: visitors
 }
