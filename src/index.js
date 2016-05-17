@@ -208,7 +208,7 @@ module.exports = (visitors = []) => {
             if (!this.sync) {
               // for async mode
               for (let visitor of visitors) {
-                if (typeof visitor.didProcess === 'function') visitor.didProcess(this, err, result, visitorCtx);
+                if (typeof visitor.didProcess === 'function') visitor.didProcess(this, err, result);
               }
               done(err, result);
             }
@@ -217,7 +217,7 @@ module.exports = (visitors = []) => {
           // for sync mode
           if (this.sync) {
             for (let visitor of visitors) {
-              if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box, visitorCtx);
+              if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
             }
           }
 
@@ -225,7 +225,7 @@ module.exports = (visitors = []) => {
         } catch (err) {
           if (this.sync) {
             for (let visitor of visitors) {
-              if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box, visitorCtx);
+              if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
             }
             throw createError(500, err, box);
           } else {
