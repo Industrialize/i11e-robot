@@ -50,10 +50,11 @@ exports.createRobot = (delegate) => {
     constructor(options = {}) {
       this.__type__ = 'robot';
       this.id = Sequence.newName(); // robot id
-      this.model = "Unnamed Model"; // robot model
       this.options = options; // robot options
-      this.sync = false;  // robot working mode: sync or async, default async
       this.comment = options.comment || "";
+
+      this.model = this.delegate.getModel ? this.delegate.getModel() : "Unnamed Model"; // robot model
+      this.sync = this.delegate.isSync ? this.delegate.isSync() : false;  // robot working mode: sync or async, default async
 
       this.setDelegate(delegate);
 
