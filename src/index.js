@@ -9,8 +9,9 @@ var defaultDelegate = {
 
 var exports = {};
 
-
-var visitors = [];
+var shared = {
+  visitors : []
+}
 
 /**
  * Robot creator: create a Robot with a delegate object
@@ -53,14 +54,14 @@ exports.createRobot = (delegate) => {
       this.options = options; // robot options
       this.comment = options.comment || "";
 
+      this.setDelegate(delegate);
+
       this.model = this.delegate.getModel ? this.delegate.getModel() : "Unnamed Model"; // robot model
       this.sync = this.delegate.isSync ? this.delegate.isSync() : false;  // robot working mode: sync or async, default async
 
-      this.setDelegate(delegate);
-
 "#if process.env.NODE_ENV !== 'production'";
       var skip = false;
-      for (let visitor of visitors) {
+      for (let visitor of shared.visitors) {
         if (typeof visitor.willCreate === 'function' && visitor.willCreate(this)) {
           skip = true;
         }
@@ -71,17 +72,15 @@ exports.createRobot = (delegate) => {
           this.delegate.initRobot.call(this);
         }
       }
+
+      for (let visitor of shared.visitors) {
+        if (typeof visitor.didCreate === 'function') visitor.didCreate(this);
+      }
 "#endif";
 
 "#if process.env.NODE_ENV === 'production'";
       if (this.delegate.initRobot) {
         this.delegate.initRobot.call(this);
-      }
-"#endif";
-
-"#if process.env.NODE_ENV !== 'production'";
-      for (let visitor of visitors) {
-        if (typeof visitor.didCreate === 'function') visitor.didCreate(this);
       }
 "#endif";
     }
@@ -150,37 +149,34 @@ exports.createRobot = (delegate) => {
      */
     filter(box) {
 "#if process.env.NODE_ENV !== 'production'";
-      var filterRet = true;
+      var skip = false;
 
-      for (let visitor of visitors) {
-        filterRet = (typeof visitor.willFilter === 'function') ? visitor.willFilter(this, box) : null;
-        if (filterRet === false) {
-          return false;
-        } else if (filterRet === true) {
-          return true;
-        } else {
-          // continue
+      for (let visitor of shared.visitors) {
+        if (typeof visitor.willFilter === 'function' && visitor.willFilter(this, box)) {
+          skip = true;
         }
       }
-"#endif";
 
       var passOrNot = true;
+      if (!skip) {
+        if (this.delegate.filter) passOrNot = this.delegate.filter.call(this, box);
+      }
 
-      if (this.delegate.filter) passOrNot = this.delegate.filter.call(this, box);
-
-"#if process.env.NODE_ENV !== 'production'";
-      for (let visitor of visitors) {
-        filterRet = (typeof visitor.didFilter === 'function') ? visitor.didFilter(this, box, passOrNot) : null;
-        if (filterRet === false) {
-          return false;
-        } else if (filterRet === true) {
-          return true;
-        } else {
-          // continue
+      for (let visitor of shared.visitors) {
+        if (typeof visitor.didFilter === 'function') {
+          if (!visitor.didFilter(this, box, passOrNot)) {
+            passOrNot = false;
+          }
         }
       }
-"#endif";
       return passOrNot;
+"#endif";
+
+"#if process.env.NODE_ENV === 'production'";
+      var passOrNot = true;
+      if (this.delegate.filter) passOrNot = this.delegate.filter.call(this, box);
+      return passOrNot;
+"#endif";
     }
 
     /**
@@ -192,7 +188,7 @@ exports.createRobot = (delegate) => {
     process(box, done) {
 "#if process.env.NODE_ENV !== 'production'";
       var skip = false;
-      for (let visitor of visitors) {
+      for (let visitor of shared.visitors) {
         skip = (typeof visitor.willProcess === 'function') ? visitor.willProcess(this, box) : null;
         if (skip) skip = true;
       }
@@ -213,7 +209,7 @@ exports.createRobot = (delegate) => {
         var ret =  this.delegate.process.call(this, box, (err, result) => {
           if (!this.sync) {
             // for async mode
-            for (let visitor of visitors) {
+            for (let visitor of shared.visitors) {
               if (typeof visitor.didProcess === 'function') visitor.didProcess(this, err, result);
             }
             done(err, result);
@@ -222,7 +218,7 @@ exports.createRobot = (delegate) => {
 
         // for sync mode
         if (this.sync) {
-          for (let visitor of visitors) {
+          for (let visitor of shared.visitors) {
             if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
           }
         }
@@ -230,7 +226,7 @@ exports.createRobot = (delegate) => {
         return ret;
       } catch (err) {
         if (this.sync) {
-          for (let visitor of visitors) {
+          for (let visitor of shared.visitors) {
             if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
           }
           throw createError(500, err, box);
@@ -295,7 +291,10 @@ exports.createRobot = (delegate) => {
  * @param  {Extenstion} extensions Array of extenstions
  */
 exports.extend = function (extensions) {
-  visitors = extensions.getRobotVisitors();
+  var visitors = extensions.getRobotVisitors();
+  for (var visitor of visitors) {
+    shared.visitors.push(visitor);
+  }
 }
 
 module.exports = exports;
