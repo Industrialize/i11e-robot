@@ -78,7 +78,7 @@ exports['test Robot'] = {
 
     var pl = Pipeline.pipeline((source) => {
       return source._()
-        .install(new MyRobot())
+        .next(new MyRobot())
         .install(new MyRobot())
         .install(new MyRobot())
         .install(new MyRobot())
@@ -89,7 +89,7 @@ exports['test Robot'] = {
       .doto(
         (box) => {
           test.equal(box.get('v'), 5);
-          //test.equal(myRbtVisitor.count, 5);  // count 5
+          test.equal(myRbtVisitor.count, 5);  // count 5
           test.done();
         }
       )
