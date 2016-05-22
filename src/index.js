@@ -134,15 +134,23 @@ exports.createRobot = (delegate) => {
 
     /**
      * Get robot id
-     * @return {[type]} [description]
+     * @return {String} robot id
      */
     getId() {
       return this.id;
     }
 
     /**
+     * Get robot name
+     * @return {string} robot name
+     */
+    getName() {
+      return this.name;
+    }
+
+    /**
      * Get robot model
-     * @return {[type]} [description]
+     * @return {String} robot model
      */
     getModel() {
       return this.model;
@@ -399,7 +407,7 @@ exports.createRobot = (delegate) => {
   return Robot;
 }
 
-exports.robot = (fn, options) => {
+exports.robot = (fn, options = {}) => {
   if (!options.name) options.name = 'Anonymous';
   if (!options.model) options.model = 'Unnamed Model';
   if (!options.comment) options.comment = options.model;
@@ -433,7 +441,7 @@ exports.robot = (fn, options) => {
   });
 }
 
-exports.filter = (fn, options) => {
+exports.filter = (fn, options = {}) => {
   if (!options.name) options.name = 'Anonymous';
   if (!options.model) options.model = 'Unnamed Model';
   if (!options.comment) options.comment = options.model;
