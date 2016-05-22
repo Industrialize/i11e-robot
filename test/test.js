@@ -80,6 +80,62 @@ exports['test Robot'] = {
 
   },
 
+  'test robot shortcut': function(test) {
+    const Robot = require('../lib/index');
+
+    var greetingRobot = Robot.robot((box, done) => {
+      box.set('greeting', 'Hello World');
+      done(null, box);
+    }, {
+      name: 'test greeting robot',
+      model: 'GreetingRobot',
+      comment: `just a test for robot shortcut`
+    });
+
+    const Pipeline = require('i11e-pipeline');
+
+    var pl = Pipeline.pipeline();
+    pl._()
+      .install(greetingRobot)
+      .doto((box) => {
+        test.equal(box.get('greeting'), 'Hello World');
+        test.done();
+      })
+      .drive();
+
+    pl.$().push({});
+  },
+
+  'test filter shortcut': function(test) {
+    const Robot = require('../lib/index');
+
+    var filterRobot = Robot.filter((box) => {
+      return box.get('v') > 100;
+    }, {
+      name: 'test filter',
+      model: 'GreaterThan100FilterRobot',
+      comment: `just a test for filter shortcut`
+    });
+
+    const Pipeline = require('i11e-pipeline');
+
+    var count = 0;
+    var pl = Pipeline.pipeline();
+    pl._()
+      .doto((box) => {
+        count++;
+      })
+      .install(filterRobot)
+      .doto((box) => {
+        if (count >= 2) test.done();
+      })
+      .drive();
+
+    pl.$()
+      .push({v: 100})
+      .push({v: 101})
+  },
+
   'test robot visitor': function(test) {
     const extension = require('../../i11e-extension/lib/index');
 

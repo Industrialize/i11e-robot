@@ -399,6 +399,69 @@ exports.createRobot = (delegate) => {
   return Robot;
 }
 
+exports.robot = (fn, options) => {
+  if (!options.name) options.name = 'Anonymous';
+  if (!options.model) options.model = 'Unnamed Model';
+  if (!options.comment) options.comment = options.model;
+  if (!options.sync) options.sync = false;
+
+  var RobotModel = exports.createRobot({
+    getModel() {
+      return options.model || 'Unnamed Model';
+    },
+
+    isSync() {
+      return options.sync;
+    },
+
+    isFilter() {
+      return false;
+    },
+
+    process(box, done) {
+      if (options.sync) {
+        return fn(box);
+      } else {
+        fn(box, done);
+      }
+    }
+  });
+
+  return new RobotModel({
+    name: options.name,
+    comment: options.comment
+  });
+}
+
+exports.filter = (fn, options) => {
+  if (!options.name) options.name = 'Anonymous';
+  if (!options.model) options.model = 'Unnamed Model';
+  if (!options.comment) options.comment = options.model;
+
+  var RobotModel = exports.createRobot({
+    getModel() {
+      return options.model || 'Unnamed Model';
+    },
+
+    isSync() {
+      return true;
+    },
+
+    isFilter() {
+      return true;
+    },
+
+    process(box) {
+      return fn(box);
+    }
+  });
+
+  return new RobotModel({
+    name: options.name,
+    comment: options.comment
+  });
+}
+
 /**
  * extend the module with extensions
  * @param  {Extenstion} extensions Array of extenstions
