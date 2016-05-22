@@ -41,6 +41,45 @@ exports['test Robot'] = {
     });
   },
 
+  'test filter': (test) => {
+    const Robot = require('../lib');
+    const Pipeline = require('i11e-pipeline');
+
+    var MyRobot = Robot.createRobot({
+      isFilter() {
+        return true;
+      },
+
+      process(box) {
+        var ret = box.get('v') > 10;
+        return ret;
+      }
+    });
+
+    var pl = Pipeline.pipeline();
+
+    var count = 0;
+    pl._()
+      .doto((box) => {
+        count++;
+        if (count >= 2) {
+          test.done();
+        }
+      })
+      .install(new MyRobot())
+      .doto((box) => {
+        if (box.get('v') <= 10) {
+          test.ok(false);
+        }
+      })
+      .drive();
+
+    pl.$()
+      .push({v: 11})
+      .push({v: 1})
+
+  },
+
   'test robot visitor': function(test) {
     const extension = require('../../i11e-extension/lib/index');
 
@@ -48,9 +87,15 @@ exports['test Robot'] = {
       initVisitor() {
         this.count = 0;
       },
-      willProcess(robot, err, box) {
+      accept() {
+        return true;
+      },
+      willInit(robot) {},
+      didInit(robot) {},
+      willProcess(robot, box) {
         this.count++;
-      }
+      },
+      didProcess(robot, err, box) {}
     });
 
     var myRbtVisitor = new MyRobotVisitor();

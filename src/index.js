@@ -9,9 +9,8 @@ var defaultDelegate = {
 
 var exports = {};
 
-var shared = {
-  visitors : []
-}
+var visitors = [];
+
 
 /**
  * Robot creator: create a Robot with a delegate object
@@ -26,7 +25,8 @@ var shared = {
  * @return {Function}          a new robot creater function
  */
 exports.createRobot = (delegate) => {
-  const ReserverdFunctions = ['setDelegate', 'filter', 'input', 'output', 'comment', 'process', 'examples', 'getId', 'getModel', 'isSync'];
+  const ReserverdFunctions = ['setDelegate', 'input', 'output', 'comment',
+    'process', 'examples', 'getId', 'getModel', 'isSync', 'isFilter'];
   const createError = require('i11e-utils').error;
   const Sequence = {
     newName() {
@@ -50,37 +50,54 @@ exports.createRobot = (delegate) => {
      */
     constructor(options = {}) {
       this.__type__ = 'robot';
-      this.id = Sequence.newName(); // robot id
       this.options = options; // robot options
-      this.comment = options.comment || "";
 
       this.setDelegate(delegate);
 
+      // robot instance properties
+      this.id = Sequence.newName(); // robot id
+      this.name = options.name || this.id; // robot name, could be initiated from options
+      this.comment = options.comment || ""; // comment of this robot, could be initiated from options
+
+      // robot class properties
       this.model = this.delegate.getModel ? this.delegate.getModel() : "Unnamed Model"; // robot model
       this.sync = this.delegate.isSync ? this.delegate.isSync() : false;  // robot working mode: sync or async, default async
+      this.filter = this.delegate.isFilter ? this.delegate.isFilter() : false;
+      if (this.filter) this.sync = true;  // filter must be sync
 
+      // init the robot by delegation
 "#if process.env.NODE_ENV !== 'production'";
-      var skip = false;
-      for (let visitor of shared.visitors) {
-        if (typeof visitor.willCreate === 'function' && visitor.willCreate(this)) {
-          skip = true;
-        }
-      }
+      // pre processing of robot initiation
+      var skip = this.preInit();
 
+      // robot initiation if it is not skipped by the pre processing
       if (!skip) {
         if (this.delegate.initRobot) {
-          this.delegate.initRobot.call(this);
+          try {
+            this.delegate.initRobot.call(this);
+          } catch (err) {
+            console.error(`Error when initiating robot ${this.model}` )
+            console.error(err.message);
+            console.error(err.stack);
+          }
         }
       }
 
-      for (let visitor of shared.visitors) {
-        if (typeof visitor.didCreate === 'function') visitor.didCreate(this);
-      }
+      // post processing of robot initiation
+      this.postInit();
 "#endif";
 
 "#if process.env.NODE_ENV === 'production'";
       if (this.delegate.initRobot) {
-        this.delegate.initRobot.call(this);
+        if (this.delegate.initRobot) {
+          try {
+            this.delegate.initRobot.call(this);
+          } catch (err) {
+            console.error(`Error when initiating robot ${this.model}` )
+            console.error(err.message);
+            console.error(err.stack);
+          }
+        }
       }
 "#endif";
     }
@@ -92,9 +109,6 @@ exports.createRobot = (delegate) => {
      */
     setDelegate(delegate) {
       this.delegate = delegate;
-
-      if (this.delegate.getModel) this.model = this.delegate.getModel();
-      if (this.delegate.isSync) this.sync = this.delegate.isSync();
 
       if (!this.delegate.process) {
         // default process method
@@ -143,95 +157,83 @@ exports.createRobot = (delegate) => {
     }
 
     /**
-     * Filter the box to process
-     * @param  {Box} box the box
-     * @return {Boolean}     true if accept otherwise false
+     * If the robot is a filter
      */
-    filter(box) {
+    isFilter() {
+      return this.filter;
+    }
+
+    doFilter(box) {
 "#if process.env.NODE_ENV !== 'production'";
-      var skip = false;
+      var skip = this.preFilter(this, box);
 
-      for (let visitor of shared.visitors) {
-        if (typeof visitor.willFilter === 'function' && visitor.willFilter(this, box)) {
-          skip = true;
-        }
-      }
-
-      var passOrNot = true;
+      var pass = true;
+      var error = null;
       if (!skip) {
-        if (this.delegate.filter) passOrNot = this.delegate.filter.call(this, box);
-      }
-
-      for (let visitor of shared.visitors) {
-        if (typeof visitor.didFilter === 'function') {
-          if (!visitor.didFilter(this, box, passOrNot)) {
-            passOrNot = false;
-          }
+        try {
+          pass = this.delegate.process.call(this, box);
+        } catch (err) {
+          error = err;
         }
       }
-      return passOrNot;
+
+      var newPass = this.postFilter(error, box, pass);
+      if (newPass === null || newPass === undefined) {
+        return pass;
+      }
+      return newPass;
 "#endif";
 
 "#if process.env.NODE_ENV === 'production'";
-      var passOrNot = true;
-      if (this.delegate.filter) passOrNot = this.delegate.filter.call(this, box);
-      return passOrNot;
+      try {
+        return this.delegate.process.call(this, box);
+      } catch (err) {
+        throw createError(500, err, box);
+      }
 "#endif";
     }
 
-    /**
-     * Process the box
-     * @param  {Box}   box  the box object to process
-     * @param  {Function} done callback function used to put err or processed box back to production line
-     * @return {Box}        only return processed box when in sync mode
-     */
-    process(box, done) {
+    doSyncProcess(box) {
 "#if process.env.NODE_ENV !== 'production'";
-      var skip = false;
-      for (let visitor of shared.visitors) {
-        skip = (typeof visitor.willProcess === 'function') ? visitor.willProcess(this, box) : null;
-        if (skip) skip = true;
+      var skip = this.preProcess(box);
+
+      var returnBox = box;
+      var error = null;
+      if (!skip) {
+        try {
+          returnBox = this.delegate.process.call(this, box);
+        } catch (err) {
+          error = err;
+        }
       }
 
-      // skip process if necessary
-      if (skip) {
-        for (let visitor of visitors) {
-          if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
-        }
-        if (this.sync) {
-          return box;
-        } else {
-          return done(null, box);
-        }
-      } // PROCESS END HERE IF SKIP === true
+      this.postProcess(returnBox);
 
+      return returnBox;
+"#endif";
+
+"#if process.env.NODE_ENV === 'production'";
       try {
-        var ret =  this.delegate.process.call(this, box, (err, result) => {
-          if (!this.sync) {
-            // for async mode
-            for (let visitor of shared.visitors) {
-              if (typeof visitor.didProcess === 'function') visitor.didProcess(this, err, result);
-            }
-            done(err, result);
-          }
-        });
-
-        // for sync mode
-        if (this.sync) {
-          for (let visitor of shared.visitors) {
-            if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
-          }
-        }
-
-        return ret;
+        return this.delegate.process.call(this, box);
       } catch (err) {
-        if (this.sync) {
-          for (let visitor of shared.visitors) {
-            if (typeof visitor.didProcess === 'function') visitor.didProcess(this, null, box);
-          }
-          throw createError(500, err, box);
-        } else {
-          done(createError(500, err, box), box);
+        throw createError(500, err, box);
+      }
+"#endif";
+    }
+
+    doAsyncProcess(box, done) {
+"#if process.env.NODE_ENV !== 'production'";
+      var skip = this.preProcess(box);
+
+      if (!skip) {
+        try {
+          this.delegate.process.call(this, box, (err, result) => {
+            this.postProcess(err, result);
+            done(err, result);
+          });
+        } catch (err) {
+          this.postProcess(err, box);
+          done(err, box);
         }
       }
 "#endif";
@@ -240,13 +242,124 @@ exports.createRobot = (delegate) => {
       try {
         return this.delegate.process.call(this, box, done);
       } catch (err) {
-        if (this.sync) {
-          throw createError(500, err, box);
-        } else {
-          done(createError(500, err, box), box);
-        }
+        done(createError(500, err, box), box);
       }
 "#endif";
+    }
+
+    /**
+     * Process the box, or filter the box
+     * @param  {Box}   box  the box object to process
+     * @param  {Function} done callback function used to put err or processed box back to production line
+     * @return {Box}        only return processed box when in sync mode
+     */
+    process(box, done) {
+      if (this.isSync()) {
+        if (this.isFilter()) {
+          return this.doFilter(box);
+        } else {
+          return this.doSyncProcess(box);
+        }
+      } else {
+        return this.doAsyncProcess(box, done);
+      }
+    }
+
+    /**
+     * Pre initiate the robot, return true to skip the init process
+     * @return {Boolean} skip the init process or not
+     */
+    preInit() {
+      var skip = false;
+      for (let visitor of visitors) {
+        if (visitor.accept(this) && visitor.willInit(this)) {
+          skip = true;
+        }
+      }
+
+      return skip;
+    }
+
+    /**
+     * Post initiate the robot
+     */
+    postInit() {
+      for (let visitor of visitors) {
+        if (visitor.accept(this)) {
+          visitor.didInit(this);
+        }
+      }
+    }
+
+    /**
+     * pre filter the box
+     * @param  {box} box the box to process
+     * @return {Boolean}     skip the filter or not
+     */
+    preFilter(box) {
+      var skip = false;
+      for (let visitor of visitors) {
+        if (visitor.accept(this, box) && visitor.willProcess(this, box)) {
+          skip = true;
+        }
+      }
+
+      return skip;
+    }
+
+    /**
+     * post filter the box
+     * @param  {error} error error occurs in the filtering process
+     * @param  {Box} box   the box to process
+     * @param  {Boolean} pass  the filtering result
+     * @return {Boolean}       the new filtering result
+     */
+    postFilter(error, box, pass) {
+      var newPass = pass;
+      for (let visitor of visitors) {
+        if (visitor.accept(this, box) && !visitor.didProcess(this, error, box, pass)) {
+          newPass = false;
+        }
+      }
+
+      if (error) {
+        throw createError(500, error, box);
+      }
+
+      return newPass;
+    }
+
+    /**
+     * pre process the box
+     * @param  {box} box the box to process
+     * @return {Boolean}     skip the processing or not
+     */
+    preProcess(box) {
+      var skip = false;
+      for (let visitor of visitors) {
+        if (visitor.accept(this, box) && visitor.willProcess(this, box)) {
+          skip = true;
+        }
+      }
+
+      return skip;
+    }
+
+    /**
+     * post process the box
+     * @param  {error} error the error generated from procecssing
+     * @param  {box} box   the box processed
+     */
+    postProcess(error, box) {
+      for (let visitor of visitors) {
+        if (visitor.accept(this, box)) {
+          visitor.didProcess(this, error, box);
+        }
+      }
+
+      if (error) {
+        throw createError(500, error, box);
+      }
     }
 
     /**
@@ -291,9 +404,9 @@ exports.createRobot = (delegate) => {
  * @param  {Extenstion} extensions Array of extenstions
  */
 exports.extend = function (extensions) {
-  var visitors = extensions.getRobotVisitors();
-  for (var visitor of visitors) {
-    shared.visitors.push(visitor);
+  var rbtVisitors = extensions.getRobotVisitors();
+  for (var visitor of rbtVisitors) {
+    visitors.push(visitor);
   }
 }
 
