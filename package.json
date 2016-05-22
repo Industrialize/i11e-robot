@@ -1,6 +1,6 @@
 {
   "name": "i11e-robot",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "i11e Robot",
   "main": "lib/index.js",
   "scripts": {
