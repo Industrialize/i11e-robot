@@ -215,7 +215,7 @@ exports.createRobot = (delegate) => {
         }
       }
 
-      this.postProcess(returnBox);
+      this.postProcess(error, returnBox);
 
       return returnBox;
 "#endif";
